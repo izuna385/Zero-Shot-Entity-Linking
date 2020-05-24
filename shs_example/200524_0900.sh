@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=0,1 python3 ./src/train.py -num_epochs 50 -cuda_devices 0,1
