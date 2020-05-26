@@ -105,7 +105,7 @@ class InKBAllEntitiesEncoder:
         out_dict = self.entity_encoder_wrapping_model(**batch)
         return self.tonp(out_dict['gold_duidx']), self.tonp(out_dict['emb_of_entities_encoded'])
 
-class BiEncoder_for_Eval(Model):
+class BiEncoderForOnlyMentionOutput(Model):
     def __init__(self, args,
                  mention_encoder: Seq2VecEncoder,
                  vocab):

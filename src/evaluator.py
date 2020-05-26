@@ -1,9 +1,9 @@
 from data_reader import OneWorldAllEntityinKBIterateLoader
 from utils import simplejopen, j_intidx2str_opener, parse_duidx2encoded_emb_for_debugging, parse_duidx2encoded_emb_2_dui2emb, KBIndexerWithFaiss, jdump
-from utils import oneworld_entiredataset_loader_for_encoding_entities
+from utils import oneworld_entiredataset_loader_for_encoding_entities, BiEncoderTopXRetriever
 from model import WrappedModel_for_entityencoding
-from encoders import InKBAllEntitiesEncoder, BiEncoder_for_Eval
-from utils_for_evaluator import BiEncoderTopXRetriever, DevandTest_BiEncoder_IterateEvaluator
+from encoders import InKBAllEntitiesEncoder, BiEncoderForOnlyMentionOutput
+from utils_for_evaluator import DevandTest_BiEncoder_IterateEvaluator
 import pdb, os
 
 class Evaluate_one_world:
@@ -45,7 +45,7 @@ class Evaluate_one_world:
         print('+++++Indexnizing KB from encoded entites FINISHED!+++++')
 
         print('Loading Biencoder')
-        biencoder_onlyfor_encodingmentions = BiEncoder_for_Eval(args=self.args,
+        biencoder_onlyfor_encodingmentions = BiEncoderForOnlyMentionOutput(args=self.args,
                                                                 mention_encoder=self.trainfinished_mention_encoder,
                                                                 vocab=self.vocab)
         biencoder_onlyfor_encodingmentions.cuda()

@@ -6,6 +6,11 @@ import numpy as np
 from tqdm import tqdm
 import faiss
 from commons import TRAIN_WORLDS, DEV_WORLDS, TEST_WORLDS
+from allennlp.nn import util as nn_util
+from allennlp.data.iterators import BasicIterator
+from tqdm import tqdm
+import torch
+from torch.nn.functional import normalize
 
 def worlds_loader(args):
     if args.debug:
@@ -171,3 +176,56 @@ class KBIndexerWithFaiss:
 
     def indexed_faiss_returner(self):
         return self.indexed_faiss
+
+class BiEncoderTopXRetriever:
+    def __init__(self, args, vocab, biencoder_onlyfor_encodingmentions, faiss_stored_kb, reader_for_mentions):
+        self.args = args
+        self.mention_encoder = biencoder_onlyfor_encodingmentions
+        self.mention_encoder.eval()
+        self.faiss_searcher = faiss_stored_kb
+        self.reader_for_mentions = reader_for_mentions
+        self.sequence_iterator = BasicIterator(batch_size=self.args.batch_size_for_eval)
+        self.sequence_iterator.index_with(vocab)
+        self.cuda_device = 0
+
+    def biencoder_tophits_retrievaler(self, dev_or_test_flag, how_many_top_hits_preserved=500):
+        ds = self.reader_for_mentions.read(dev_or_test_flag)
+        generator_for_biencoder = self.sequence_iterator(ds, num_epochs=1, shuffle=False)
+        generator_for_biencoder_tqdm = tqdm(generator_for_biencoder, total=self.sequence_iterator.get_num_batches(ds))
+
+        with torch.no_grad():
+            for batch in generator_for_biencoder_tqdm:
+                batch = nn_util.move_to_device(batch, self.cuda_device)
+                mention_uniq_ids, encoded_mentions, gold_duidxs = self._extract_mention_idx_encoded_emb_and_its_gold_cuidx(batch=batch)
+                faiss_search_candidate_result_cuidxs = self.faiss_topx_retriever(encoded_mentions=encoded_mentions,
+                                                                                 how_many_top_hits_preserved=how_many_top_hits_preserved)
+                yield faiss_search_candidate_result_cuidxs, mention_uniq_ids, gold_duidxs
+
+    def faiss_topx_retriever(self, encoded_mentions, how_many_top_hits_preserved):
+        '''
+        if cossimsearch -> re-sort with L2, we have to use self.args.cand_num_before_sort_candidates_forBLINKbiencoder
+        Args:
+            encoded_mentions:
+            how_many_top_hits_preserved:
+        Returns:
+        '''
+
+        if self.args.search_method == 'cossim':
+            encoded_mentions = normalize(torch.from_numpy(encoded_mentions), dim=1).cpu().detach().numpy()
+            _, faiss_search_candidate_result_cuidxs = self.faiss_searcher.search(encoded_mentions, how_many_top_hits_preserved)
+
+        else:
+            # assert self.args.search_method == 'indexflatl2'
+            _, faiss_search_candidate_result_cuidxs = self.faiss_searcher.search(encoded_mentions, how_many_top_hits_preserved)
+        return faiss_search_candidate_result_cuidxs
+
+    def calc_L2distance(self, h, t):
+        diff = h - t
+        return torch.norm(diff, dim=2)
+
+    def tonp(self, tsr):
+        return tsr.detach().cpu().numpy()
+
+    def _extract_mention_idx_encoded_emb_and_its_gold_cuidx(self, batch) -> np.ndarray:
+        out_dict = self.mention_encoder(**batch)
+        return self.tonp(out_dict['mention_uniq_id']), self.tonp(out_dict['contextualized_mention']), self.tonp(out_dict['gold_duidx'])
