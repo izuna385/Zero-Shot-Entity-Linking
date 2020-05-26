@@ -49,7 +49,7 @@ also, multi-gpu is supported.
   []()
   <div align="center"><img src="./img/dual_encoder.png" width=70%></div>
 
-## 3. Logginmg Each Experiment
+## 3. Logging Each Experiment
 
 * See `./src/experiment_logdir/`.
 
