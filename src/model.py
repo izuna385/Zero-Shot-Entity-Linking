@@ -40,7 +40,7 @@ class Biencoder(Model):
             scores = contextualized_mention.mm(encoded_entites.t())
         else:
             assert self.args.search_method == 'indexflatl2'
-            scores = - self.calc_L2distance(contextualized_mention, encoded_entites.unsqueeze(1).repeat(1, batch_num, 1))
+            scores = - self.calc_L2distance(contextualized_mention.view(batch_num, 1, -1), encoded_entites) # FIXED
 
         device = torch.get_device(scores) if self.cuda_flag else torch.device('cpu')
         target = torch.LongTensor(torch.arange(batch_num)).to(device)
