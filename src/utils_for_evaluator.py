@@ -67,6 +67,7 @@ class DevandTest_BiEncoder_IterateEvaluator:
         self.args = args
         self.world_name = world_name
 
+    # TODO: Add L2 based sorting
     def final_evaluation(self, dev_or_test_flag, how_many_top_hits_preserved=500):
         print('============\n<<<FINAL EVALUATION STARTS>>>', self.world_name, 'in', dev_or_test_flag, 'Retrieve_Candidates:', how_many_top_hits_preserved,'\n============')
         Hits1, Hits10, Hits50, Hits100, Hits500 = 0, 0, 0, 0, 0

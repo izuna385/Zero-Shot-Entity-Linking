@@ -50,6 +50,8 @@ class Pooler_for_mention(Seq2VecEncoder):
         self.word_embedder = word_embedder
         self.word_embedding_dropout = nn.Dropout(self.args.word_embedding_dropout)
 
+        self.linear_for_mention_encoding = nn.Linear(self.bertpooler_sec2vec.get_output_dim(),self.bertpooler_sec2vec.get_output_dim())
+
     def huggingface_nameloader(self):
         if self.args.bert_name == 'bert-base-uncased':
             self.bert_weight_filepath = 'bert-base-uncased'
@@ -64,6 +66,10 @@ class Pooler_for_mention(Seq2VecEncoder):
         mention_emb = self.word_embedding_dropout(mention_emb)
         mention_emb = self.bertpooler_sec2vec(mention_emb, mask_sent)
 
+        if self.args.add_linear_for_mention:
+            mention_emb = self.linear_for_mention_encoding(mention_emb)
+        else:
+            pass
         return mention_emb
 
 class InKBAllEntitiesEncoder:

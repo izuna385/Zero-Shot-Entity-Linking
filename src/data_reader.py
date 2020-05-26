@@ -31,8 +31,8 @@ class WorldsReader(DatasetReader):
         mention_ids = list()
         mentions = self.from_worldname_2_mentions()
         for mention_uniq_id, mention_data in tqdm(mentions.items()):
-            # if self.args.debug and (int(mention_uniq_id) == self.args.debugsamplenum):
-            #     break
+            if self.args.debug and (int(mention_uniq_id) == self.args.debugsamplenum):
+                break
             data = self.lineparser_for_mention(line=mention_data, mention_uniq_id=mention_uniq_id)
             yield self.text_to_instance(data=data)
 
@@ -56,8 +56,8 @@ class WorldsReader(DatasetReader):
         data["gold_dui"] = gold_dui
         data["gold_duidx"] = self.dui2idx[gold_dui]
 
-        anchored_context_split = [Token(split_token) for split_token in self.tokenizer_custom_noSEPandCLS(txt=' '.join(anchored_context))] # mention anchor is included.
-        # tokenized_mention = [Token(split_token) for split_token in self.tokenizer_custom_noSEPandCLS(txt=raw_mention)]
+        # TODO: Add limit to the tokenized max context length
+        anchored_context_split = [Token(split_token) for split_token in self.tokenizer_custom_noSEPandCLS(txt=' '.join(anchored_context))]
 
         data['context'] = anchored_context_split
         data['gold_title_and_desc_concatenated'] = self.gold_title_and_desc_concatenated_returner(gold_dui=gold_dui)

@@ -32,6 +32,9 @@ class Biencoder(Model):
         contextualized_mention = self.mention_encoder(context)
         encoded_entites = self.entity_encoder(title_and_desc_concatnated_text=gold_title_and_desc_concatenated)
 
+        # Check the batch-wise product
+        # https://discuss.pytorch.org/t/dot-product-batch-wise/9746
+
         if self.args.search_method == 'cossim':
             contextualized_mention_forcossim = normalize(contextualized_mention, dim=1)
             encoded_entites_forcossim = normalize(encoded_entites, dim=1)
@@ -52,6 +55,9 @@ class Biencoder(Model):
 
         output = {'loss': loss}
 
+        if self.args.add_mse_for_biencoder:
+            output['loss'] += self.mesloss(contextualized_mention, encoded_entites)
+
         if self.istrainflag:
             golds = torch.eye(batch_num).to(device)
             if self.args.search_method in ['cossim','indexflatip']:
@@ -61,6 +67,8 @@ class Biencoder(Model):
         else:
             output['gold_duidx'] = gold_duidx
             output['encoded_mentions'] = contextualized_mention
+
+
         return output
 
     @overrides

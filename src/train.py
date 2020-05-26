@@ -27,6 +27,7 @@ def main():
     P = Params()
     opts = P.opts
     experiment_logdir = experiment_logger(args=opts)
+    print("experiment_logdir:", experiment_logdir)
     P.dump_params(experiment_dir=experiment_logdir)
     cuda_devices = cuda_device_parser(str_ids=opts.cuda_devices)
     TRAIN_WORLDS, DEV_WORLDS, TEST_WORLDS = worlds_loader(args=opts)
@@ -51,6 +52,8 @@ def main():
     for epoch in range(opts.num_epochs):
         oneep_train_start = time.time()
         for world_name in TRAIN_WORLDS:
+            # TODO: Add mining negatives difficult to classify, for harder training
+
             reader = WorldsReader(args=opts, world_name=world_name, token_indexers=global_toknIndexer, tokenizer=global_tokenizer)
             trains = reader.read('train')
             trainer = Trainer(model=model, optimizer=optimizer,
@@ -59,6 +62,7 @@ def main():
                               cuda_device=cuda_devices, num_epochs=1
                               )
             trainer.train()
+
         oneep_train_end = time.time()
         print('epoch {0} train time'.format(epoch+1), oneep_train_end - oneep_train_start, 'sec')
 
@@ -96,6 +100,7 @@ def main():
 
     exp_end_time = time.time()
     print('===experiment finised', exp_end_time-exp_start_time, 'sec')
+    print(experiment_logdir)
 
 if __name__ == '__main__':
     main()

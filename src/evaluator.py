@@ -1,5 +1,6 @@
 from data_reader import OneWorldAllEntityinKBIterateLoader
 from utils import simplejopen, j_intidx2str_opener, parse_duidx2encoded_emb_for_debugging, parse_duidx2encoded_emb_2_dui2emb, KBIndexerWithFaiss, jdump
+from utils import oneworld_entiredataset_loader_for_encoding_entities
 from model import WrappedModel_for_entityencoding
 from encoders import InKBAllEntitiesEncoder, BiEncoder_for_Eval
 from utils_for_evaluator import BiEncoderTopXRetriever, DevandTest_BiEncoder_IterateEvaluator
@@ -36,21 +37,17 @@ class Evaluate_one_world:
                                                                vocab=vocab)
 
     def evaluate_one_world(self):
-        duidx2encoded_emb = self.encodeAllEntitiesEncoder.encoding_all_entities()
-        dui2encoded_emb = parse_duidx2encoded_emb_2_dui2emb(duidx2encoded_emb=duidx2encoded_emb, original_dui2idx=self.dui2idx)
+        dui2encoded_emb =  self.dui2EncoderEntityEmbReturner()
         print('=====Encoding all entities in KB FINISHED!=====')
 
         print('\n+++++Indexnizing KB from encoded entites+++++')
-        forstoring_encoded_entities_to_faiss = KBIndexerWithFaiss(args=self.args, input_dui2idx=self.dui2idx,
-                                                                 input_idx2dui=self.idx2dui, input_dui2emb=dui2encoded_emb,
-                                                                 search_method_for_faiss=self.args.search_method,
-                                                                 entity_emb_dim=768)
+        forstoring_encoded_entities_to_faiss = self.encodedEmbFaissAdder(dui2EncodedEmb=dui2encoded_emb)
         print('+++++Indexnizing KB from encoded entites FINISHED!+++++')
 
         print('Loading Biencoder')
         biencoder_onlyfor_encodingmentions = BiEncoder_for_Eval(args=self.args,
-                                                                     mention_encoder=self.trainfinished_mention_encoder,
-                                                                     vocab=self.vocab)
+                                                                mention_encoder=self.trainfinished_mention_encoder,
+                                                                vocab=self.vocab)
         biencoder_onlyfor_encodingmentions.cuda()
         biencoder_onlyfor_encodingmentions.eval()
         print('Loaded: Biencoder')
@@ -89,15 +86,21 @@ class Evaluate_one_world:
         load self.dui2desc, self.dui2title, self.idx2dui
         :return:
         '''
-        worlds_dir = self.args.dir_for_each_world + self.world_name + '/'
-        dui2desc_path = worlds_dir + "dui2desc.json"
-        dui2title_path = worlds_dir + "dui2title.json"
-        idx2dui_path = worlds_dir + "idx2dui.json"
+        self.dui2idx, self.idx2dui, self.dui2title, self.dui2desc = oneworld_entiredataset_loader_for_encoding_entities(args=self.args,
+                                                                                                                        world_name=self.world_name)
 
-        self.dui2desc = simplejopen(dui2desc_path)
-        self.dui2title = simplejopen(dui2title_path)
-        self.idx2dui = j_intidx2str_opener(idx2dui_path)
+    def duidx2EncodedEmbReturner(self):
+        return self.encodeAllEntitiesEncoder.encoding_all_entities()
 
-        self.dui2idx = {}
-        for idx, dui in self.idx2dui.items():
-            self.dui2idx.update({dui:int(idx)})
+    def dui2EncoderEntityEmbReturner(self):
+        duidx2encoded_emb = self.encodeAllEntitiesEncoder.encoding_all_entities()
+        dui2encoded_emb = parse_duidx2encoded_emb_2_dui2emb(duidx2encoded_emb=duidx2encoded_emb,
+                                                            original_dui2idx=self.dui2idx)
+
+        return dui2encoded_emb
+
+    def encodedEmbFaissAdder(self, dui2EncodedEmb):
+        return KBIndexerWithFaiss(args=self.args, input_dui2idx=self.dui2idx,
+                                  input_idx2dui=self.idx2dui, input_dui2emb=dui2EncodedEmb,
+                                  search_method_for_faiss=self.args.search_method,
+                                  entity_emb_dim=768)

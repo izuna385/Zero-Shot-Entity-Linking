@@ -21,8 +21,14 @@ class Params:
         parser.add_argument('-beta2', action="store", default=0.999, type=float)
         parser.add_argument('-epsilon', action="store", default=1e-8, type=float)
         parser.add_argument('-amsgrad', action='store', default=False, type=strtobool)
+        # After split with BERTtokenizer
+        parser.add_argument('-max_title_len', action='store', default=12, type=int)
+        parser.add_argument('-max_desc_len', action='store', default=50, type=int)
+        # parser.add_argument('-max_context_len_after_tokenize', action='store', default=80, type=int)
 
         parser.add_argument('-search_method', action='store', default='cossim', type=str)
+        parser.add_argument('-add_linear_for_mention', action='store', default=False, type=strtobool)
+        parser.add_argument('-add_mse_for_biencoder', action='store', default=False, type=strtobool)
 
         parser = self.fixed_params_for_preprocess_adder(parser=parser)
         self.opts = parser.parse_args(sys.argv[1:])
@@ -39,16 +45,12 @@ class Params:
         parser.add_argument('-extracted_first_token_for_description', action='store', default=100, type=int)
         parser.add_argument('-extracted_first_token_for_title', action='store', default=16, type=int)
 
-        # After split with BERTtokenizer
-        parser.add_argument('-max_title_len', action='store', default=12, type=int)
-        parser.add_argument('-max_desc_len', action='store', default=50, type=int)
-
         parser.add_argument('-dataset_dir', action='store', default='./data/', type=str)
         parser.add_argument('-documents_dir', action='store', default='./data/documents/', type=str)
         parser.add_argument('-mentions_dir', action='store', default='./data/mentions/', type=str)
         parser.add_argument('-mentions_splitbyworld_dir', action='store', default='./data/mentions_split_by_world/', type=str)
         parser.add_argument('-mention_leftandright_tokenwindowwidth', action='store', default=40, type=int)
-        parser.add_argument('-debugsamplenum', action='store', default=600, type=int)
+        parser.add_argument('-debugsamplenum', action='store', default=200, type=int)
         parser.add_argument('-dir_for_each_world', action='store', default='./data/worlds/', type=str)
         parser.add_argument('-experiment_logdir', action='store', default='./src/experiment_logdir/', type=str)
         return parser

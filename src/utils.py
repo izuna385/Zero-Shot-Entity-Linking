@@ -13,6 +13,26 @@ def worlds_loader(args):
     else:
         return TRAIN_WORLDS, DEV_WORLDS, TEST_WORLDS
 
+def oneworld_entiredataset_loader_for_encoding_entities(args, world_name):
+    '''
+    load self.dui2desc, self.dui2title, self.idx2dui
+    :return:
+    '''
+    worlds_dir = args.dir_for_each_world + world_name + '/'
+    dui2desc_path = worlds_dir + "dui2desc.json"
+    dui2title_path = worlds_dir + "dui2title.json"
+    idx2dui_path = worlds_dir + "idx2dui.json"
+
+    dui2desc = simplejopen(dui2desc_path)
+    dui2title = simplejopen(dui2title_path)
+    idx2dui = j_intidx2str_opener(idx2dui_path)
+
+    dui2idx = {}
+    for idx, dui in idx2dui.items():
+        dui2idx.update({dui:int(idx)})
+
+    return dui2idx, idx2dui, dui2title, dui2desc
+
 def simplejopen(json_file_path):
     with open(json_file_path, 'r') as f:
         j = json.load(f)
