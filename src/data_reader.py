@@ -193,13 +193,13 @@ class OneWorldAllEntityinKBIterateLoader(DatasetReader):
         title_and_desc_concatenated = []
         title_and_desc_concatenated.append('[CLS]')
         title = self.dui2title[dui]
-        title_tokens = [Token(split_word) for split_word in self.tokenizer_custom(txt=title)]
+        title_tokens = [split_word for split_word in self.tokenizer_custom(txt=title)]
 
         title_and_desc_concatenated += title_tokens[:self.args.max_title_len]
 
         title_and_desc_concatenated.append(TITLE_AND_DESC_BONDTOKEN)
         desc = self.dui2desc[dui]
-        desc_tokens = [Token(split_word) for split_word in self.tokenizer_custom(txt=desc)]
+        desc_tokens = [split_word for split_word in self.tokenizer_custom(txt=desc)]
         title_and_desc_concatenated += desc_tokens[:self.args.max_desc_len]
         title_and_desc_concatenated.append('[SEP]')
 
