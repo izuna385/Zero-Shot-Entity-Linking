@@ -57,4 +57,8 @@ also, multi-gpu is supported.
 
 # LICENSE
 
-* MIT
+* License 
+  
+  (Quoted from  [[Logeswaran et al., '19]](https://github.com/lajanugen/zeshel)).
+
+  This dataset was constructed using Wikias from FANDOM and is licensed under the Creative Commons Attribution-Share Alike License (CC-BY-SA).
