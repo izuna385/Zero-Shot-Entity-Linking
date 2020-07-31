@@ -1,3 +1,31 @@
+# Closed Repository for Dense Entity Retrieval
+
+## TODO
+
+* Preprocess with more strict sentence processing.
+  
+  * Detection Sentence Boundary.
+
+* using only canonicals or descriptions
+
+* WikilinksNed Evaluation
+
+* Wikipedia Preprocessing and pretraining evaluation
+
+* save/load models
+
+~~* Add iterative dev evaluation~~
+
+## Ideas
+
+* How to consider relations between entities
+
+  * Named match distance supervision --> add edge
+  
+~~* Remove tanh activation and use only linear layer for mention projection~~
+  
+* ~~Dimintionality Reduction~~
+
 # Dual-Encoder-Based Zero-Shot Entity Linking
 ## Quick Starts in 3 minutes
 
@@ -49,7 +77,7 @@ also, multi-gpu is supported.
   []()
   <div align="center"><img src="./img/dual_encoder.png" width=70%></div>
 
-## 3. Logging Each Experiment
+## 3. Logginmg Each Experiment
 
 * See `./src/experiment_logdir/`.
 
@@ -57,8 +85,4 @@ also, multi-gpu is supported.
 
 # LICENSE
 
-* License 
-  
-  (Quoted from  [[Logeswaran et al., '19]](https://github.com/lajanugen/zeshel)).
-
-  This dataset was constructed using Wikias from FANDOM and is licensed under the Creative Commons Attribution-Share Alike License (CC-BY-SA).
+* MIT

@@ -1,8 +1,6 @@
-from commons import MENTION_START_TOKEN, MENTION_END_TOKEN, TITLE_AND_DESC_BONDTOKEN, CLS_TOKEN, SEP_TOKEN
+from commons import MENTION_START_TOKEN, MENTION_END_TOKEN
 NEVER_SPLIT_TOKEN = [MENTION_START_TOKEN, MENTION_END_TOKEN]
 from allennlp.data.token_indexers import TokenIndexer, SingleIdTokenIndexer, PretrainedTransformerIndexer
-from allennlp.data.fields import SpanField, ListField, TextField, MetadataField, ArrayField, SequenceLabelField, LabelField
-from allennlp.data.tokenizers import Token
 import transformers
 
 class TokenIndexerReturner:

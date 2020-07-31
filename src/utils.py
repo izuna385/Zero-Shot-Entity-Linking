@@ -12,9 +12,17 @@ from tqdm import tqdm
 import torch
 from torch.nn.functional import normalize
 
+def dummynegativesloader(mentionNumbers=100):
+    mention_uniq_id2negatives = {}
+    dummy_negative_dui_idxs = [0, 1]
+    for mention_uniq_id in range(mentionNumbers):
+        mention_uniq_id2negatives.update({mention_uniq_id:dummy_negative_dui_idxs})
+
+    return mention_uniq_id2negatives
+
 def worlds_loader(args):
     if args.debug:
-        return ["fallout"], ["ice_hockey"],  ["yugioh"]
+        return ["yugioh"], ["yugioh"],  ["yugioh"]
     else:
         return TRAIN_WORLDS, DEV_WORLDS, TEST_WORLDS
 
@@ -83,13 +91,14 @@ def jdump(j, path):
     with open(path, 'w') as f:
         json.dump(j, f, ensure_ascii=False, indent=4, sort_keys=False, separators=(',', ': '))
 
-def dev_or_test_finallog(entire_h1c, entire_h10c, entire_h50c, entire_h100c, entire_h500c,entire_datapoints, dev_or_test_flag, experiment_logdir):
+def dev_or_test_finallog(entire_h1c, entire_h10c, entire_h50c, entire_h64c, entire_h100c, entire_h500c,entire_datapoints, dev_or_test_flag, experiment_logdir):
     jpath = experiment_logdir + dev_or_test_flag + '_eval.json'
     jdump(path=jpath,
           j={
               'entire_h1_percent': entire_h1c / entire_datapoints * 100,
               'entire_h10_percent': entire_h10c / entire_datapoints * 100,
               'entire_h50_percent': entire_h50c / entire_datapoints * 100,
+              'entire_h64_percent': entire_h64c / entire_datapoints * 100,
               'entire_h100_percent': entire_h100c / entire_datapoints * 100,
               'entire_h500_percent': entire_h500c / entire_datapoints * 100
           })
@@ -178,7 +187,8 @@ class KBIndexerWithFaiss:
         return self.indexed_faiss
 
 class BiEncoderTopXRetriever:
-    def __init__(self, args, vocab, biencoder_onlyfor_encodingmentions, faiss_stored_kb, reader_for_mentions):
+    def __init__(self, args, vocab, biencoder_onlyfor_encodingmentions, faiss_stored_kb, reader_for_mentions,
+                 duidx2encoded_emb):
         self.args = args
         self.mention_encoder = biencoder_onlyfor_encodingmentions
         self.mention_encoder.eval()
@@ -187,9 +197,10 @@ class BiEncoderTopXRetriever:
         self.sequence_iterator = BasicIterator(batch_size=self.args.batch_size_for_eval)
         self.sequence_iterator.index_with(vocab)
         self.cuda_device = 0
+        self.duidx2encoded_emb = duidx2encoded_emb
 
-    def biencoder_tophits_retrievaler(self, dev_or_test_flag, how_many_top_hits_preserved=500):
-        ds = self.reader_for_mentions.read(dev_or_test_flag)
+    def biencoder_tophits_retrievaler(self, train_or_dev_or_test_flag, how_many_top_hits_preserved=500):
+        ds = self.reader_for_mentions.read(train_or_dev_or_test_flag)
         generator_for_biencoder = self.sequence_iterator(ds, num_epochs=1, shuffle=False)
         generator_for_biencoder_tqdm = tqdm(generator_for_biencoder, total=self.sequence_iterator.get_num_batches(ds))
 
@@ -217,6 +228,7 @@ class BiEncoderTopXRetriever:
         else:
             # assert self.args.search_method == 'indexflatl2'
             _, faiss_search_candidate_result_cuidxs = self.faiss_searcher.search(encoded_mentions, how_many_top_hits_preserved)
+
         return faiss_search_candidate_result_cuidxs
 
     def calc_L2distance(self, h, t):
@@ -226,6 +238,6 @@ class BiEncoderTopXRetriever:
     def tonp(self, tsr):
         return tsr.detach().cpu().numpy()
 
-    def _extract_mention_idx_encoded_emb_and_its_gold_cuidx(self, batch) -> np.ndarray:
+    def _extract_mention_idx_encoded_emb_and_its_gold_cuidx(self, batch):
         out_dict = self.mention_encoder(**batch)
         return self.tonp(out_dict['mention_uniq_id']), self.tonp(out_dict['contextualized_mention']), self.tonp(out_dict['gold_duidx'])

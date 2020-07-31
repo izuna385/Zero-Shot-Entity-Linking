@@ -1,7 +1,6 @@
 import argparse
 import sys, json
 from distutils.util import strtobool
-import pdb
 
 class Params:
     def __init__(self):
@@ -14,6 +13,7 @@ class Params:
         parser.add_argument('-allen_lazyload', action='store', default=True, type=strtobool)
         parser.add_argument('-batch_size_for_train', action='store', default=32, type=int)
         parser.add_argument('-batch_size_for_eval', action='store', default=8, type=int)
+        parser.add_argument('-hard_negatives_num', action='store', default=10, type=int)
         parser.add_argument('-num_epochs', action='store', default=3, type=int)
         parser.add_argument('-lr', action="store", default=1e-5, type=float)
         parser.add_argument('-weight_decay', action="store", default=0, type=float)
@@ -24,11 +24,16 @@ class Params:
         # After split with BERTtokenizer
         parser.add_argument('-max_title_len', action='store', default=12, type=int)
         parser.add_argument('-max_desc_len', action='store', default=50, type=int)
-        # parser.add_argument('-max_context_len_after_tokenize', action='store', default=80, type=int)
+        parser.add_argument('-max_context_len_after_tokenize', action='store', default=100, type=int)
 
-        parser.add_argument('-search_method', action='store', default='cossim', type=str)
-        parser.add_argument('-add_linear_for_mention', action='store', default=False, type=strtobool)
         parser.add_argument('-add_mse_for_biencoder', action='store', default=False, type=strtobool)
+        parser.add_argument('-search_method', action='store', default='indexflatip', type=str)
+        parser.add_argument('-add_hard_negatives', action='store', default=True, type=strtobool)
+        parser.add_argument('-metionPooling', action='store', default="CLS", type=str)
+        parser.add_argument('-entityPooling', action='store', default="CLS", type=str)
+
+        parser.add_argument('-dimentionReduction', action='store', default=False, type=strtobool)
+        parser.add_argument('-dimentionReductionToThisDim', action='store', default=300, type=int)
 
         parser = self.fixed_params_for_preprocess_adder(parser=parser)
         self.opts = parser.parse_args(sys.argv[1:])
@@ -50,7 +55,7 @@ class Params:
         parser.add_argument('-mentions_dir', action='store', default='./data/mentions/', type=str)
         parser.add_argument('-mentions_splitbyworld_dir', action='store', default='./data/mentions_split_by_world/', type=str)
         parser.add_argument('-mention_leftandright_tokenwindowwidth', action='store', default=40, type=int)
-        parser.add_argument('-debugsamplenum', action='store', default=200, type=int)
+        parser.add_argument('-debugSampleNum', action='store', default=100000000, type=int)
         parser.add_argument('-dir_for_each_world', action='store', default='./data/worlds/', type=str)
         parser.add_argument('-experiment_logdir', action='store', default='./src/experiment_logdir/', type=str)
         return parser

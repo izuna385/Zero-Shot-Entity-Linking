@@ -6,9 +6,6 @@ import torch.nn as nn
 from allennlp.modules.seq2vec_encoders import Seq2VecEncoder, PytorchSeq2VecWrapper, BagOfEmbeddingsEncoder
 from allennlp.modules.seq2vec_encoders import BertPooler
 from allennlp.nn.util import get_text_field_mask, add_positional_features
-from allennlp.data.dataset_readers import DatasetReader
-from allennlp.data.token_indexers import TokenIndexer, SingleIdTokenIndexer, PretrainedTransformerIndexer
-from commons import TITLE_AND_DESC_BONDTOKEN, CLS_TOKEN, SEP_TOKEN
 import numpy as np
 from tqdm import tqdm
 from allennlp.nn import util as nn_util
@@ -25,6 +22,12 @@ class Pooler_for_title_and_desc(Seq2VecEncoder):
         self.word_embedder = word_embedder
         self.word_embedding_dropout = nn.Dropout(self.args.word_embedding_dropout)
 
+        self.linear_for_entity_encoding = nn.Linear(self.bertpooler_sec2vec.get_output_dim(),
+                                                     self.bertpooler_sec2vec.get_output_dim())
+
+        self.linear_for_dimentionReduction = nn.Linear(self.bertpooler_sec2vec.get_output_dim(),
+                                                       self.args.dimentionReductionToThisDim)
+
     def huggingface_nameloader(self):
         if self.args.bert_name == 'bert-base-uncased':
             self.bert_weight_filepath = 'bert-base-uncased'
@@ -37,9 +40,20 @@ class Pooler_for_title_and_desc(Seq2VecEncoder):
         mask_sent = get_text_field_mask(title_and_desc_concatnated_text)
         entity_emb = self.word_embedder(title_and_desc_concatnated_text)
         entity_emb = self.word_embedding_dropout(entity_emb)
-        entity_emb = self.bertpooler_sec2vec(entity_emb, mask_sent)
 
-        return entity_emb
+        if self.args.entityPooling == "CLSLinear":
+            entity_emb = entity_emb[:, 0, :]
+            entity_emb = self.linear_for_entity_encoding(entity_emb)
+        elif self.args.entityPooling == 'CLS':
+            entity_emb = entity_emb[:, 0, :]
+        else:
+            assert self.args.entityPooling == "CLSLinearTanh"
+            entity_emb = self.bertpooler_sec2vec(entity_emb, mask_sent)
+
+        if self.args.dimentionReduction:
+            return self.linear_for_dimentionReduction(entity_emb)
+        else:
+            return entity_emb
 
 class Pooler_for_mention(Seq2VecEncoder):
     def __init__(self, args, word_embedder):
@@ -50,7 +64,10 @@ class Pooler_for_mention(Seq2VecEncoder):
         self.word_embedder = word_embedder
         self.word_embedding_dropout = nn.Dropout(self.args.word_embedding_dropout)
 
-        self.linear_for_mention_encoding = nn.Linear(self.bertpooler_sec2vec.get_output_dim(),self.bertpooler_sec2vec.get_output_dim())
+        self.linear_for_mention_encoding = nn.Linear(self.bertpooler_sec2vec.get_output_dim(),
+                                                     self.bertpooler_sec2vec.get_output_dim())
+        self.linear_for_dimentionReduction = nn.Linear(self.bertpooler_sec2vec.get_output_dim(),
+                                                       self.args.dimentionReductionToThisDim)
 
     def huggingface_nameloader(self):
         if self.args.bert_name == 'bert-base-uncased':
@@ -64,13 +81,20 @@ class Pooler_for_mention(Seq2VecEncoder):
         mask_sent = get_text_field_mask(contextualized_mention)
         mention_emb = self.word_embedder(contextualized_mention)
         mention_emb = self.word_embedding_dropout(mention_emb)
-        mention_emb = self.bertpooler_sec2vec(mention_emb, mask_sent)
 
-        if self.args.add_linear_for_mention:
+        if self.args.metionPooling == "CLSLinear":
+            mention_emb = mention_emb[:, 0, :]
             mention_emb = self.linear_for_mention_encoding(mention_emb)
+        elif self.args.metionPooling == 'CLS':
+            mention_emb = mention_emb[:, 0, :]
         else:
-            pass
-        return mention_emb
+            assert self.args.metionPooling == "CLSLinearTanh"
+            mention_emb = self.bertpooler_sec2vec(mention_emb, mask_sent)
+
+        if self.args.dimentionReduction:
+            return self.linear_for_dimentionReduction(mention_emb)
+        else:
+            return mention_emb
 
 class InKBAllEntitiesEncoder:
     def __init__(self, args, entity_loader_datasetreaderclass, entity_encoder_wrapping_model, vocab):
@@ -113,7 +137,8 @@ class BiEncoderForOnlyMentionOutput(Model):
         self.args = args
         self.mention_encoder = mention_encoder
 
-    def forward(self, context, gold_title_and_desc_concatenated, gold_duidx, mention_uniq_id):
+    def forward(self, context, gold_title_and_desc_concatenated, gold_duidx, mention_uniq_id,
+                gold_and_negatives_title_and_desc_concatenated, labels_for_BCEWithLogitsLoss):
         contextualized_mention = self.mention_encoder(context)
         output = {'mention_uniq_id': mention_uniq_id,
                   'gold_duidx': gold_duidx,

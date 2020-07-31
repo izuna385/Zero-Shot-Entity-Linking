@@ -164,6 +164,7 @@ class MentionParser:
 
         return world_2_dui2rawtext
 
+
 if __name__ == '__main__':
     P = Params()
     opts = P.opts

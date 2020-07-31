@@ -1,5 +1,6 @@
 import numpy as np
 from tqdm import tqdm
+import copy
 import torch
 import pdb
 from allennlp.data import Instance
@@ -14,7 +15,7 @@ from typing import Iterator
 from commons import TRAIN_WORLDS
 from commons import MENTION_START_TOKEN, MENTION_END_TOKEN, TITLE_AND_DESC_BONDTOKEN, CLS_TOKEN, SEP_TOKEN
 NEVER_SPLIT_TOKEN = [MENTION_START_TOKEN, MENTION_END_TOKEN]
-from utils import simplejopen, j_str2intidx_opener, j_intidx2str_opener
+from utils import simplejopen, j_str2intidx_opener, j_intidx2str_opener, dummynegativesloader
 
 class WorldsReader(DatasetReader):
     def __init__(self, args, world_name, token_indexers, tokenizer):
@@ -23,15 +24,15 @@ class WorldsReader(DatasetReader):
         self.world_name = world_name
         print('World {0} is now being loaded...'.format(world_name))
         self.dui2idx, self.idx2dui, self.dui2title, self.dui2desc = self.from_world_name_requireddatasetloader()
-        self.berttokenizer = tokenizer # self.berttokenizer_returner()
-        self.token_indexers = token_indexers # self.token_indexer_returner()
+        self.berttokenizer = tokenizer
+        self.token_indexers = token_indexers
+        self.mentionId2GoldDUIDX, self.mentionId2HardNegativeDUIDX = {}, dummynegativesloader(mentionNumbers=self.from_worldname_2_mentionNumbers())
 
     @overrides
     def _read(self, train_dev_testflag) -> Iterator[Instance]:
-        mention_ids = list()
         mentions = self.from_worldname_2_mentions()
         for mention_uniq_id, mention_data in tqdm(mentions.items()):
-            if self.args.debug and (int(mention_uniq_id) == self.args.debugsamplenum):
+            if self.args.debug and (int(mention_uniq_id) == self.args.debugSampleNum):
                 break
             data = self.lineparser_for_mention(line=mention_data, mention_uniq_id=mention_uniq_id)
             yield self.text_to_instance(data=data)
@@ -44,10 +45,17 @@ class WorldsReader(DatasetReader):
         fields['gold_duidx'] = ArrayField(np.array(data['gold_duidx']))
         fields['mention_uniq_id'] = ArrayField(np.array(data['mention_uniq_id']))
 
+        if self.args.add_hard_negatives:
+            fields['labels_for_BCEWithLogitsLoss'] = ArrayField(np.array(data['labels_for_BCEWithLogitsLoss']))
+            fields['gold_and_negatives_title_and_desc_concatenated'] = ListField([TextField(textfieldtokens, self.token_indexers) for textfieldtokens in data['gold_and_negatives_title_and_desc_concatenated']])
+        else:
+            fields['labels_for_BCEWithLogitsLoss'] = MetadataField(0)
+            fields['gold_and_negatives_title_and_desc_concatenated'] = MetadataField(0)
+
         return Instance(fields)
 
     def lineparser_for_mention(self, line, mention_uniq_id):
-        raw_mention = line["raw_mention"]
+        # raw_mention = line["raw_mention"]
         gold_dui = line["gold_dui"]
         anchored_context = line["anchored_context"]
 
@@ -55,12 +63,12 @@ class WorldsReader(DatasetReader):
         data["mention_uniq_id"] = mention_uniq_id
         data["gold_dui"] = gold_dui
         data["gold_duidx"] = self.dui2idx[gold_dui]
-
-        # TODO: Add limit to the tokenized max context length
-        anchored_context_split = [Token(split_token) for split_token in self.tokenizer_custom_noSEPandCLS(txt=' '.join(anchored_context))]
+        anchored_context_split = [Token(split_token) for split_token in self.tokenizer_custom_noSEPandCLS(txt=' '.join(anchored_context))][:self.args.max_context_len_after_tokenize]
 
         data['context'] = anchored_context_split
-        data['gold_title_and_desc_concatenated'] = self.gold_title_and_desc_concatenated_returner(gold_dui=gold_dui)
+        data['gold_title_and_desc_concatenated'] = self.title_and_desc_concatenated_returner(dui=gold_dui)
+        data["gold_and_negatives_title_and_desc_concatenated"] = [self.title_and_desc_concatenated_returner(dui=gold_dui)] + [self.title_and_desc_concatenated_returner(dui=self.idx2dui[idx]) for idx in self.mentionId2HardNegativeDUIDX[mention_uniq_id]]
+        data["labels_for_BCEWithLogitsLoss"] = [1] + [0 for _ in range(self.args.hard_negatives_num)]
 
         return data
 
@@ -126,9 +134,9 @@ class WorldsReader(DatasetReader):
 
         return j_str2intidx_opener(dui2idx_path), j_intidx2str_opener(idx2dui_path), simplejopen(dui2title_path), simplejopen(dui2desc_path)
 
-    def gold_title_and_desc_concatenated_returner(self, gold_dui):
-        title = self.tokenizer_custom_noSEPandCLS(txt=self.dui2title[gold_dui])
-        desc = self.tokenizer_custom_noSEPandCLS(txt=self.dui2desc[gold_dui])
+    def title_and_desc_concatenated_returner(self, dui):
+        title = self.tokenizer_custom_noSEPandCLS(txt=self.dui2title[dui])
+        desc = self.tokenizer_custom_noSEPandCLS(txt=self.dui2desc[dui])
 
         concatenated = list()
         concatenated.append(CLS_TOKEN)
@@ -141,7 +149,15 @@ class WorldsReader(DatasetReader):
 
     def from_worldname_2_mentions(self):
         mentions_path = self.args.mentions_splitbyworld_dir + self.world_name + '/mentions.json'
-        return simplejopen(mentions_path)
+        return j_intidx2str_opener(mentions_path)
+
+    def from_worldname_2_mentionNumbers(self):
+        mentions_path = self.args.mentions_splitbyworld_dir + self.world_name + '/mentions.json'
+        return len(simplejopen(mentions_path))
+
+    def hardNegativesUpdater(self, mentionId2GoldDUIDX, mentionId2HardNegativeDUIDX):
+        self.mentionId2GoldDUIDX = copy.copy(mentionId2GoldDUIDX)
+        self.mentionId2HardNegativeDUIDX = copy.copy(mentionId2HardNegativeDUIDX)
 
 '''
 For iterating all entities
@@ -193,14 +209,15 @@ class OneWorldAllEntityinKBIterateLoader(DatasetReader):
         title_and_desc_concatenated = []
         title_and_desc_concatenated.append('[CLS]')
         title = self.dui2title[dui]
-        title_tokens = [split_word for split_word in self.tokenizer_custom(txt=title)]
-
-        title_and_desc_concatenated += title_tokens[:self.args.max_title_len]
-
+        title_and_desc_concatenated += self.tokenizer_custom(txt=title)[:self.args.max_title_len]
         title_and_desc_concatenated.append(TITLE_AND_DESC_BONDTOKEN)
         desc = self.dui2desc[dui]
-        desc_tokens = [split_word for split_word in self.tokenizer_custom(txt=desc)]
-        title_and_desc_concatenated += desc_tokens[:self.args.max_desc_len]
+        title_and_desc_concatenated += self.tokenizer_custom(txt=desc)[:self.args.max_desc_len]
         title_and_desc_concatenated.append('[SEP]')
 
-        return {'title_and_desc_concatnated_text':[Token(split_word_) for split_word_ in title_and_desc_concatenated], 'duidx': idx}
+        allenTokenWrappedSequence = []
+        for tok in title_and_desc_concatenated:
+            allenTokenWrappedSequence.append(Token(tok))
+        # Do not do Token(Token('text'))
+
+        return {'title_and_desc_concatnated_text':allenTokenWrappedSequence, 'duidx': idx}

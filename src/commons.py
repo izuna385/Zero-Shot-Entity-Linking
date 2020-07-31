@@ -9,3 +9,5 @@ MENTION_END_TOKEN = '[unused2]'
 TITLE_AND_DESC_BONDTOKEN = '[unused3]'
 CLS_TOKEN = '[CLS]'
 SEP_TOKEN = '[SEP]'
+
+DevEvalDuringTrainDirForEachExperiment = 'devEvalDuringTrain'

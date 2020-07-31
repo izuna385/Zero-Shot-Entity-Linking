@@ -22,21 +22,19 @@ class Biencoder(Model):
         self.mention_encoder = mention_encoder
         self.accuracy = CategoricalAccuracy()
         self.istrainflag = 1
-        self.BCEWloss = nn.BCEWithLogitsLoss()
+        self.BCEWloss = nn.BCEWithLogitsLoss(reduction="mean")
         self.mesloss = nn.MSELoss()
         self.entity_encoder = entity_encoder
         self.cuda_flag = 1
 
-    def forward(self, context, gold_title_and_desc_concatenated, gold_duidx, mention_uniq_id):
+    def forward(self, context, gold_title_and_desc_concatenated, gold_and_negatives_title_and_desc_concatenated,
+                gold_duidx, mention_uniq_id, labels_for_BCEWithLogitsLoss):
         batch_num = context['tokens'].size(0)
         contextualized_mention = self.mention_encoder(context)
         encoded_entites = self.entity_encoder(title_and_desc_concatnated_text=gold_title_and_desc_concatenated)
 
-        # Check the batch-wise product
-        # https://discuss.pytorch.org/t/dot-product-batch-wise/9746
-
+        contextualized_mention_forcossim = normalize(contextualized_mention, dim=1)
         if self.args.search_method == 'cossim':
-            contextualized_mention_forcossim = normalize(contextualized_mention, dim=1)
             encoded_entites_forcossim = normalize(encoded_entites, dim=1)
             scores = contextualized_mention_forcossim.mm(encoded_entites_forcossim.t())
         elif self.args.search_method == 'indexflatip':
@@ -58,16 +56,28 @@ class Biencoder(Model):
         if self.args.add_mse_for_biencoder:
             output['loss'] += self.mesloss(contextualized_mention, encoded_entites)
 
+        if self.args.add_hard_negatives:
+            batch_, gold_plus_negs_num, maxTokenLengthInBatch = gold_and_negatives_title_and_desc_concatenated['tokens'].size()
+            docked_tokenlist = {'tokens': gold_and_negatives_title_and_desc_concatenated['tokens'].view(batch_ * gold_plus_negs_num, -1)}
+            encoded_entities_from_hard_negatives_idx0isgold = self.entity_encoder(docked_tokenlist).view(batch_, gold_plus_negs_num, -1)
+
+            if self.args.search_method == 'cossim':
+                encoded_mention_forcossim_ = contextualized_mention_forcossim.repeat(1, gold_plus_negs_num).view(batch_*gold_plus_negs_num, -1)
+                scores_for_hard_negatives = (((encoded_mention_forcossim_)*(normalize(encoded_entities_from_hard_negatives_idx0isgold.view(batch_*gold_plus_negs_num,-1), dim=1))).sum(1, keepdim=True).squeeze(1)).view(batch_,gold_plus_negs_num)
+            elif self.args.search_method == 'indexflatip':
+                encoded_mention_ = contextualized_mention.repeat(1, gold_plus_negs_num).view(batch_* gold_plus_negs_num, -1)
+                scores_for_hard_negatives = (((encoded_mention_)*(encoded_entities_from_hard_negatives_idx0isgold.view(batch_*gold_plus_negs_num,-1))).sum(1, keepdim=True).squeeze(1)).view(batch_,gold_plus_negs_num)
+            else:
+                raise NotImplementedError
+
+            loss += self.BCEWloss(scores_for_hard_negatives, labels_for_BCEWithLogitsLoss)
+
         if self.istrainflag:
             golds = torch.eye(batch_num).to(device)
-            if self.args.search_method in ['cossim','indexflatip']:
-                self.accuracy(scores, torch.argmax(golds, dim=1))
-            else:
-                self.accuracy(scores, torch.argmax(golds, dim=1))
+            self.accuracy(scores, torch.argmax(golds, dim=1))
         else:
             output['gold_duidx'] = gold_duidx
             output['encoded_mentions'] = contextualized_mention
-
 
         return output
 
