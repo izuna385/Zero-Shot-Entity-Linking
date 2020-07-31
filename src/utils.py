@@ -109,6 +109,8 @@ def experiment_logger(args):
     :return: dirs for experiment log
     '''
     experimet_logdir = args.experiment_logdir # / is included
+    if not os.path.exists(experimet_logdir):
+        os.mkdir(experimet_logdir)
 
     timestamp = datetime.now(timezone('Asia/Tokyo'))
     str_timestamp = '{0:%Y%m%d_%H%M%S}'.format(timestamp)[2:]
