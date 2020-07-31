@@ -1,5 +1,3 @@
-# Closed Repository for Dense Entity Retrieval
-
 # Dual-Encoder-Based Zero-Shot Entity Linking
 ## Quick Starts in 3 minutes
 
