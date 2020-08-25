@@ -21,7 +21,7 @@ also, multi-gpu is supported.
 
   * Following [[Logeswaran et al., '19]](https://github.com/lajanugen/zeshel), entities are not shared between train-dev and train-test.
 
-  * If you interested in what this repository does, see the original paper, or unofficial slides.
+  * If you are interested in what this repository does, see the original paper, or unofficial slides.
 
     * [Original paper](https://arxiv.org/abs/1911.03814)
 
@@ -49,7 +49,7 @@ also, multi-gpu is supported.
   []()
   <div align="center"><img src="./img/dual_encoder.png" width=70%></div>
 
-## 3. Logginmg Each Experiment
+## 3. Logging Each Experiment
 
 * See `./src/experiment_logdir/`.
 
@@ -58,9 +58,7 @@ also, multi-gpu is supported.
 
 ## TODO
 
-* Preprocess with more strict sentence processing.
-
-  * Detection Sentence Boundary.
+* Preprocess with more strict sentence boundary.
 
 # LICENSE
 
