@@ -5,9 +5,36 @@ dui: Document ID in each world.
 from commons import TRAIN_WORLDS, DEV_WORLDS, TEST_WORLDS, MENTION_START_TOKEN, MENTION_END_TOKEN
 import os, pdb
 from tqdm import tqdm
+import json
 from parameters import Params
-from utils import jdump, oneworld_opener, mentions_in_train_dev_test_loader, simplejopen
 ALL_WORLDS = TRAIN_WORLDS + DEV_WORLDS + TEST_WORLDS
+
+def simplejopen(json_file_path):
+    with open(json_file_path, 'r') as f:
+        j = json.load(f)
+    return j
+
+def oneworld_opener(one_world_jsonpath):
+    lines = []
+    with open(one_world_jsonpath, 'r') as f:
+        for line in f:
+            json_parsed = json.loads(line)
+            lines.append(json_parsed)
+
+    return lines
+
+def mentions_in_train_dev_test_loader(mention_jsonpath):
+    lines = []
+    with open(mention_jsonpath, 'r') as f:
+        for line in f:
+            json_parsed = json.loads(line)
+            lines.append(json_parsed)
+
+    return lines
+
+def jdump(j, path):
+    with open(path, 'w') as f:
+        json.dump(j, f, ensure_ascii=False, indent=4, sort_keys=False, separators=(',', ': '))
 
 class OneWorldParser:
     '''
@@ -128,6 +155,7 @@ class MentionParser:
         mention_start_tokenidx = one_line_mention["start_index"]
         mention_end_tokenidx = one_line_mention["end_index"]
 
+        # TODO: SENTENCE BOUNDARY DETECTION
         context_start_index, context_end_index = 0, 0
         if mention_start_tokenidx - self.args.mention_leftandright_tokenwindowwidth >= 0:
             context_start_index += mention_start_tokenidx - self.args.mention_leftandright_tokenwindowwidth
