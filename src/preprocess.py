@@ -5,9 +5,44 @@ dui: Document ID in each world.
 from commons import TRAIN_WORLDS, DEV_WORLDS, TEST_WORLDS, MENTION_START_TOKEN, MENTION_END_TOKEN
 import os, pdb
 from tqdm import tqdm
+import json
+import spacy
 from parameters import Params
-from utils import jdump, oneworld_opener, mentions_in_train_dev_test_loader, simplejopen
+import os
+import copy
+import time, random
+from multiprocessing import Pool
+import multiprocessing
+
 ALL_WORLDS = TRAIN_WORLDS + DEV_WORLDS + TEST_WORLDS
+nlp = spacy.load("en_core_web_sm")
+
+def simplejopen(json_file_path):
+    with open(json_file_path, 'r') as f:
+        j = json.load(f)
+    return j
+
+def oneworld_opener(one_world_jsonpath):
+    lines = []
+    with open(one_world_jsonpath, 'r') as f:
+        for line in f:
+            json_parsed = json.loads(line)
+            lines.append(json_parsed)
+
+    return lines
+
+def mentions_in_train_dev_test_loader(mention_jsonpath):
+    lines = []
+    with open(mention_jsonpath, 'r') as f:
+        for line in f:
+            json_parsed = json.loads(line)
+            lines.append(json_parsed)
+
+    return lines
+
+def jdump(j, path):
+    with open(path, 'w') as f:
+        json.dump(j, f, ensure_ascii=False, indent=4, sort_keys=False, separators=(',', ': '))
 
 class OneWorldParser:
     '''
@@ -99,13 +134,18 @@ class MentionParser:
 
         world_2_idx2mention = {}
         skipped = 0
+        n_cores = multiprocessing.cpu_count()
+        with Pool(n_cores) as pool:
+            imap = pool.imap(self.mentionConverter, mentions)
+            result = list(tqdm(imap, total=len(mentions)))
+
         for mention_data in tqdm(mentions):
-            try:
-                mention_json = self.mentionConverter(one_line_mention=mention_data)
-            except:
-                skipped += 1
-                print("mention id", mention_data["mention_id"], "is skipped because gold cannot be found")
-                continue
+            # try:
+            mention_json = self.mentionConverter(one_line_mention=mention_data)
+            # except:
+            #     skipped += 1
+            #     print("mention id", mention_data["mention_id"], "is skipped because gold cannot be found")
+            #     continue
             world_belongingto = mention_json["gold_world"]
             if world_belongingto not in world_2_idx2mention:
                 world_2_idx2mention.update({world_belongingto:{}})
@@ -128,23 +168,46 @@ class MentionParser:
         mention_start_tokenidx = one_line_mention["start_index"]
         mention_end_tokenidx = one_line_mention["end_index"]
 
-        context_start_index, context_end_index = 0, 0
-        if mention_start_tokenidx - self.args.mention_leftandright_tokenwindowwidth >= 0:
-            context_start_index += mention_start_tokenidx - self.args.mention_leftandright_tokenwindowwidth
-            context_end_index += mention_end_tokenidx + self.args.mention_leftandright_tokenwindowwidth
-        else:
-            context_end_index = self.args.mention_leftandright_tokenwindowwidth * 2 - mention_end_tokenidx
-
         raw_context = self.worldName_2_dui2rawtext[gold_world][dui_where_mention_exist].strip().split(' ')
-        raw_context.insert(mention_start_tokenidx, MENTION_START_TOKEN)
-        raw_context.insert(mention_end_tokenidx + 2, MENTION_END_TOKEN)
 
-        context = raw_context[context_start_index:context_end_index]
+        doc = nlp(' '.join(raw_context))
+        sents = [w.text for w in doc.sents]
+
+        sent_data = {}
+        first_tok_idx = 0
+
+        mention_insert_flag = 0
+
+        local_mention_anchored_context = []
+        for sent in sents:
+            sent_length = len(sent.split(' '))
+            sent_finish_idx = first_tok_idx + sent_length
+
+            sent_idx = len(sent_data)
+
+            sent_data.update({
+                sent_idx:
+                    {'first_tok_idx': first_tok_idx,
+                     'final_tok_idx': sent_finish_idx}
+            })
+
+            raw_sent = sent.split(' ')
+
+            if first_tok_idx <= mention_start_tokenidx and mention_end_tokenidx < first_tok_idx + sent_length:
+                mention_insert_flag += 1
+                raw_sent.insert(mention_start_tokenidx - first_tok_idx, MENTION_START_TOKEN)
+                raw_sent.insert(mention_end_tokenidx - first_tok_idx + 2, MENTION_END_TOKEN)
+                local_mention_anchored_context = copy.copy(raw_sent)
+            first_tok_idx += sent_length
+            sent_data[sent_idx].update({'sents_with_anchored_if_mention_included': raw_sent})
+
+        assert mention_insert_flag == 1
+
 
         return {"raw_mention": raw_mention,
                 "gold_dui": gold_dui,
                 "gold_world": gold_world,
-                "anchored_context": context}
+                "anchored_context": local_mention_anchored_context}
 
     def mention_preprocesseddir_for_each_world_makedir(self):
         for world in ALL_WORLDS:
