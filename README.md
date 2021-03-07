@@ -5,7 +5,9 @@
 git clone https://github.com/izuna385/Zero-Shot-Entity-Linking.git
 cd Zero-Shot-Entity-Linking
 python -m spacy download en_core_web_sm
-sh preprocessing.sh  # ~3 min
+
+# ~ Multiprocessing Sentence Boundary Detection takes about 2 hours under 8 core CPUs.
+sh preprocessing.sh
 python3 ./src/train.py -num_epochs 1
 ```
 For further speednizing to check entire script, run the following command.
