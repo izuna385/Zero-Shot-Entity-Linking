@@ -10,10 +10,12 @@ import spacy
 from parameters import Params
 import os
 import copy
+import time, random
+from multiprocessing import Pool
+import multiprocessing
 
-os.environ['KMP_DUPLICATE_LIB_OK']='True'
 ALL_WORLDS = TRAIN_WORLDS + DEV_WORLDS + TEST_WORLDS
-nlp = spacy.load("en_core_web_trf")
+nlp = spacy.load("en_core_web_sm")
 
 def simplejopen(json_file_path):
     with open(json_file_path, 'r') as f:
@@ -132,6 +134,11 @@ class MentionParser:
 
         world_2_idx2mention = {}
         skipped = 0
+        n_cores = multiprocessing.cpu_count()
+        with Pool(n_cores) as pool:
+            imap = pool.imap(self.mentionConverter, mentions)
+            result = list(tqdm(imap, total=len(mentions)))
+
         for mention_data in tqdm(mentions):
             # try:
             mention_json = self.mentionConverter(one_line_mention=mention_data)
@@ -161,21 +168,10 @@ class MentionParser:
         mention_start_tokenidx = one_line_mention["start_index"]
         mention_end_tokenidx = one_line_mention["end_index"]
 
-        # TODO: SENTENCE BOUNDARY DETECTION
-        # python -m spacy download en_core_web_trf
-
-
-        context_start_index, context_end_index = 0, 0
-        if mention_start_tokenidx - self.args.mention_leftandright_tokenwindowwidth >= 0:
-            context_start_index += mention_start_tokenidx - self.args.mention_leftandright_tokenwindowwidth
-            context_end_index += mention_end_tokenidx + self.args.mention_leftandright_tokenwindowwidth
-        else:
-            context_end_index = self.args.mention_leftandright_tokenwindowwidth * 2 - mention_end_tokenidx
-
         raw_context = self.worldName_2_dui2rawtext[gold_world][dui_where_mention_exist].strip().split(' ')
 
         doc = nlp(' '.join(raw_context))
-        sents = [w for w in doc.sents]
+        sents = [w.text for w in doc.sents]
 
         sent_data = {}
         first_tok_idx = 0
@@ -184,7 +180,7 @@ class MentionParser:
 
         local_mention_anchored_context = []
         for sent in sents:
-            sent_length = len(sent.text.split(' '))
+            sent_length = len(sent.split(' '))
             sent_finish_idx = first_tok_idx + sent_length
 
             sent_idx = len(sent_data)
@@ -195,7 +191,7 @@ class MentionParser:
                      'final_tok_idx': sent_finish_idx}
             })
 
-            raw_sent = sent.text.split(' ')
+            raw_sent = sent.split(' ')
 
             if first_tok_idx <= mention_start_tokenidx and mention_end_tokenidx < first_tok_idx + sent_length:
                 mention_insert_flag += 1
