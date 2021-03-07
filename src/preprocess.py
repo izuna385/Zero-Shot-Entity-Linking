@@ -225,7 +225,6 @@ class MentionParser:
                                                           mentions_dir=self.args.mentions_dir,
                                                           worldName_2_dui2rawtext=self.worldName_2_dui2rawtext)
         print('\n{0} mentions are now preprocessed...\n'.format(train_dev_testflag))
-
         world_2_idx2mention = {}
         skipped = 0
         n_cores = multiprocessing.cpu_count()
@@ -238,6 +237,7 @@ class MentionParser:
             with open(mention_json_path, 'r') as pj:
                 mention_json = json.load(pj)
             if int(mention_json['mention_insert_flag']) == 0:
+                skipped += 1
                 continue
             # mention_json = self.mentionConverter(one_line_mention_path=mention_path)
             # except:
@@ -248,7 +248,7 @@ class MentionParser:
             if world_belongingto not in world_2_idx2mention:
                 world_2_idx2mention.update({world_belongingto:{}})
             world_2_idx2mention[world_belongingto].update({len(world_2_idx2mention[world_belongingto]):mention_json})
-
+        print('skipped:', skipped, 'mentions because gold id not exist.')
         for world, its_preprocesseddata in world_2_idx2mention.items():
             jdump(its_preprocesseddata, self.args.mentions_splitbyworld_dir + world + "/mentions.json")
 
