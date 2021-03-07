@@ -4,6 +4,7 @@
 ```
 git clone https://github.com/izuna385/Zero-Shot-Entity-Linking.git
 cd Zero-Shot-Entity-Linking
+python -m spacy download en_core_web_sm
 sh preprocessing.sh  # ~3 min
 python3 ./src/train.py -num_epochs 1
 ```
