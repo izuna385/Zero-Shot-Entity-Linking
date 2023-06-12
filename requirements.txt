@@ -1,6 +1,6 @@
 tqdm
 numpy
-transformers==2.8.1
+transformers==4.30.0
 torch==1.2.0
 allennlp==0.9.0
 faiss==1.6.0
